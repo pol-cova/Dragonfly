@@ -6,7 +6,7 @@ Privacy-first CTF **Drops**: timed events with personalized puzzles, private com
 
 **Stack:** Next.js · Convex · Midnight Compact · TypeScript monorepo (`apps/web`, `convex/`, `packages/`)
 
-More detail: [architecture](docs/architecture.md) · [privacy model](docs/privacy-model.md)
+More detail: [architecture](docs/architecture.md) · [privacy model](docs/privacy-model.md) · [judge runbook](docs/judge-runbook.md) · [deploy](docs/deploy.md)
 
 ## Quick start
 

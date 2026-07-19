@@ -1,10 +1,10 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { api } from "convex/_generated/api";
+import { TermLink, TermPanel, TermStatus } from "@/components/terminal";
 import { WingPreview } from "@/components/wing/wing-preview";
 
 export function WingReveal() {
@@ -16,27 +16,25 @@ export function WingReveal() {
   });
 
   if (!flight) {
-    return <p className="p-16 text-slate-400">Loading Wing...</p>;
+    return <p className="font-mono text-sm text-[var(--fg-dim)]">loading…</p>;
   }
 
   const badgeSeed = flight.badgeSeed ?? flight.credentialCommitment;
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center gap-8 px-6 py-20 text-center">
-      <p className="text-xs uppercase tracking-[0.35em] text-amber-400">
-        Wing Acquired
-      </p>
-      <WingPreview badgeSeed={badgeSeed} size={260} />
-      <div>
-        <h1 className="font-display text-3xl text-cyan-50">The Silent Signal</h1>
-        <p className="mt-2 font-mono text-cyan-300">{flight.alias}</p>
-        <p className="mt-4 inline-block rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1 text-sm text-emerald-300">
-          Verified
-        </p>
-      </div>
-      <Link href="/solvers" className="text-cyan-400 hover:underline">
-        View solver board →
-      </Link>
+    <div className="space-y-5">
+      <TermPanel>
+        <p className="font-terminal text-2xl text-[var(--fg)]">your wing</p>
+        <div className="mt-4">
+          <WingPreview badgeSeed={badgeSeed} size={200} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
+          <TermStatus label="drop" value={flight.dropId} />
+          <TermStatus label="alias" value={flight.alias} />
+        </div>
+      </TermPanel>
+
+      <TermLink href="/solvers">solvers</TermLink>
     </div>
   );
 }

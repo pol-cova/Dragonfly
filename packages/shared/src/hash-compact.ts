@@ -1,8 +1,11 @@
-import { persistentHash } from "@midnight-ntwrk/compact-runtime";
-import {
-  Bytes32Descriptor,
-  CompactTypeVector,
-} from "@midnight-ntwrk/compact-runtime";
+/**
+ * Referee-compatible hashing for Convex + web.
+ *
+ * Uses BLAKE2b-256 via @noble/hashes so Convex isolates can run without
+ * Midnight WASM. The Compact circuit uses Midnight `persistentHash` when the
+ * on-chain claim path is wired; local-referee claims use this digest.
+ */
+import { blake2b } from "@noble/hashes/blake2.js";
 import { bytesToHex, hexToBytes } from "./bytes";
 
 export function padBytes32(value: string): Uint8Array {
@@ -32,7 +35,9 @@ export function persistentHashVector(parts: Uint8Array[]): string {
       throw new Error("persistentHashVector requires 32-byte parts");
     }
   }
-  const vectorType = new CompactTypeVector(parts.length, Bytes32Descriptor);
-  const digest = persistentHash(vectorType, parts);
-  return bytesToHex(digest);
+  const concat = new Uint8Array(parts.length * 32);
+  parts.forEach((part, index) => {
+    concat.set(part, index * 32);
+  });
+  return bytesToHex(blake2b(concat, { dkLen: 32 }));
 }

@@ -9,10 +9,13 @@
  */
 
 import type * as drops from "../drops.js";
+import type * as dropsActions from "../dropsActions.js";
 import type * as dropsQueries from "../dropsQueries.js";
 import type * as flights from "../flights.js";
 import type * as flightsInternal from "../flightsInternal.js";
+import type * as lib_drops from "../lib/drops.js";
 import type * as lib_game from "../lib/game.js";
+import type * as lib_session from "../lib/session.js";
 import type * as solvers from "../solvers.js";
 
 import type {
@@ -23,10 +26,13 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   drops: typeof drops;
+  dropsActions: typeof dropsActions;
   dropsQueries: typeof dropsQueries;
   flights: typeof flights;
   flightsInternal: typeof flightsInternal;
+  "lib/drops": typeof lib_drops;
   "lib/game": typeof lib_game;
+  "lib/session": typeof lib_session;
   solvers: typeof solvers;
 }>;
 

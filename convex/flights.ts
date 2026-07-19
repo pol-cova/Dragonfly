@@ -19,7 +19,7 @@ import {
   assertValidWalletSessionId,
   MAX_ACTIVE_FLIGHTS_PER_SESSION,
 } from "./lib/session";
-import { ensureDropSeeded } from "./lib/drops";
+import { ensureDropsSeeded } from "./lib/drops";
 
 const MAX_ATTEMPTS_PER_STAGE = 20;
 const FLIGHT_TTL_MS = 4 * 60 * 60 * 1000;
@@ -46,11 +46,16 @@ function toPublicFlight(flight: {
   let stage;
   if (flight.status === "active" || flight.status === "completed") {
     if (flight.currentStage === 1) {
-      stage = buildStage1(flight.publicSeed, flight.fragmentA);
+      stage = buildStage1(flight.publicSeed, flight.fragmentA, flight.dropId);
     } else if (flight.currentStage === 2) {
-      stage = buildStage2(flight.publicSeed, flight.fragmentA);
+      stage = buildStage2(flight.publicSeed, flight.fragmentA, flight.dropId);
     } else if (flight.currentStage === 3) {
-      stage = buildStage3(flight.publicSeed, flight.fragmentA, flight.fragmentB);
+      stage = buildStage3(
+        flight.publicSeed,
+        flight.fragmentA,
+        flight.fragmentB,
+        flight.dropId,
+      );
     }
   }
 
@@ -86,7 +91,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     assertValidWalletSessionId(args.walletSessionId);
 
-    await ensureDropSeeded(ctx);
+    await ensureDropsSeeded(ctx);
 
     const drop = await ctx.db
       .query("drops")
@@ -243,12 +248,17 @@ export const submitStage = mutation({
     const receipt = randomHex(16);
     let nextStageContent;
     if (nextStage === 2) {
-      nextStageContent = buildStage2(flight.publicSeed, flight.fragmentA);
+      nextStageContent = buildStage2(
+        flight.publicSeed,
+        flight.fragmentA,
+        flight.dropId,
+      );
     } else if (nextStage === 3) {
       nextStageContent = buildStage3(
         flight.publicSeed,
         flight.fragmentA,
         flight.fragmentB,
+        flight.dropId,
       );
     }
 
@@ -260,6 +270,16 @@ export const submitStage = mutation({
     };
   },
 });
+
+type CompleteResult = {
+  claimReady: boolean;
+  completionCredential: string;
+  privatePlayerSecret: string;
+  credentialCommitment: string;
+  dropId: string;
+  flightId: string;
+  alias: string;
+};
 
 export const complete = action({
   args: {
@@ -275,10 +295,20 @@ export const complete = action({
     flightId: v.string(),
     alias: v.string(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<CompleteResult> => {
     assertValidWalletSessionId(args.walletSessionId);
 
-    const flight = await ctx.runQuery(internal.flightsInternal.getSecretFlight, {
+    const flight: {
+      flightId: string;
+      dropId: string;
+      alias: string;
+      walletSessionId: string;
+      status: string;
+      credentialReleasedAt?: number;
+      completionCredential: string;
+      privatePlayerSecret: string;
+      credentialCommitment: string;
+    } | null = await ctx.runQuery(internal.flightsInternal.getSecretFlight, {
       flightId: args.flightId,
     });
 
@@ -287,9 +317,10 @@ export const complete = action({
     if (flight.status !== "completed") throw new Error("Stages incomplete");
     if (flight.credentialReleasedAt) throw new Error("Credential already released");
 
-    const drop = await ctx.runQuery(internal.flightsInternal.getDropById, {
-      dropId: flight.dropId,
-    });
+    const drop: { opensAt: number; closesAt: number } | null = await ctx.runQuery(
+      internal.flightsInternal.getDropById,
+      { dropId: flight.dropId },
+    );
     if (!drop) throw new Error("Drop not found");
 
     const now = Date.now();

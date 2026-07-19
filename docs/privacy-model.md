@@ -23,6 +23,10 @@ The `claimWing` circuit accepts `completionCredential` and `privatePlayerSecret`
 
 Convex is the trusted game referee for stage validation. It never exposes credentials via queries. The `complete` action returns the credential once to the Flight owner (`walletSessionId`).
 
+## Hashing note (MVP)
+
+Convex + web referee commitments currently use BLAKE2b-256 (`@noble/hashes`) so the backend can run without Midnight WASM. When the Lace + Compact claim path is fully wired, on-chain verification should use Midnight `persistentHash` with matching witness encoding.
+
 ## Limitations
 
 This MVP is not a fully trustless CTF engine. Stage correctness is enforced by Convex. Midnight enforces private credential claims when the chain path is wired. Credentials are stored plaintext at rest on Convex.

@@ -2,6 +2,7 @@
 
 import { generateWingSvg } from "@dragonfly/wing-generator";
 import { useMemo } from "react";
+import { cn } from "@/lib/utils";
 
 export function WingPreview({
   badgeSeed,
@@ -19,7 +20,7 @@ export function WingPreview({
 
   return (
     <div
-      className={className}
+      className={cn("pixel-crisp inline-block text-[var(--fg)]", className)}
       dangerouslySetInnerHTML={{ __html: svg }}
       aria-label="Wing preview"
     />

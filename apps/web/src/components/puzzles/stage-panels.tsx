@@ -3,16 +3,16 @@
 import { useState } from "react";
 import type { StageContent } from "@dragonfly/shared";
 import { decodeStage1Fragment } from "@dragonfly/drop-engine";
+import { TermButton, TermInput, TermPanel } from "@/components/terminal";
 
-export function StageRecon({
-  stage,
-  onSubmit,
-  loading,
-}: {
+type StageProps = {
   stage: StageContent;
   onSubmit: (answer: string) => void;
-  loading: boolean;
-}) {
+  submitting: boolean;
+  shake?: boolean;
+};
+
+export function StageRecon({ stage, onSubmit, submitting, shake }: StageProps) {
   const payload = stage.payload as {
     channel?: string;
     waveform?: string;
@@ -33,62 +33,41 @@ export function StageRecon({
       : null;
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-cyan-500/20 bg-[#041018] p-6">
-        <p className="text-xs uppercase tracking-[0.3em] text-amber-400">
-          Transmission Interface
+    <div className="space-y-3">
+      <TermPanel>
+        <p className="font-mono text-xs text-[var(--fg-dim)]">
+          channel: {payload.channel ?? "unknown"}
         </p>
-        <div className="mt-4 font-mono text-xs text-cyan-200/70">
-          <p>CHANNEL: {payload.channel ?? "unknown"}</p>
-          <p className="mt-2 break-all">WAVEFORM: {payload.waveform}</p>
-          <button
-            type="button"
-            onClick={() => setRevealed(true)}
-            className="mt-4 rounded border border-cyan-500/30 px-3 py-1 text-cyan-300 hover:bg-cyan-500/10"
-          >
-            Inspect {payload.channel} metadata ({payload.metadataHint})
-          </button>
+        <p className="mt-2 break-all font-mono text-sm text-[var(--fg)]">
+          {payload.waveform}
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <TermButton type="button" onClick={() => setRevealed(true)}>
+            inspect metadata
+          </TermButton>
           {decodedFragment && (
-            <p className="mt-3 text-amber-300">
-              Extracted signal body: {decodedFragment}
-            </p>
+            <span className="font-mono text-sm text-[var(--fg-warn)]">
+              {decodedFragment}
+            </span>
           )}
         </div>
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSubmit(answer);
+      </TermPanel>
+      <TermInput
+        placeholder="fragment_a"
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        busy={submitting}
+        shake={shake}
+        onSubmitValue={(value) => {
+          setAnswer(value);
+          onSubmit(value);
         }}
-        className="flex gap-3"
-      >
-        <input
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Enter Fragment A"
-          className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 font-mono text-sm text-cyan-100 outline-none focus:border-cyan-400"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-xl bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 disabled:opacity-50"
-        >
-          Submit
-        </button>
-      </form>
+      />
     </div>
   );
 }
 
-export function StageCrypto({
-  stage,
-  onSubmit,
-  loading,
-}: {
-  stage: StageContent;
-  onSubmit: (answer: string) => void;
-  loading: boolean;
-}) {
+export function StageCrypto({ stage, onSubmit, submitting, shake }: StageProps) {
   const payload = stage.payload as {
     fragmentA: string;
     cipherKey: string;
@@ -97,53 +76,35 @@ export function StageCrypto({
   const [answer, setAnswer] = useState("");
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-cyan-500/20 bg-[#041018] p-6">
-        <p className="text-xs uppercase tracking-[0.3em] text-amber-400">
-          Cipher Grid
+    <div className="space-y-3">
+      <TermPanel>
+        <p className="font-mono text-sm text-[var(--fg-dim)]">
+          fragment A: {payload.fragmentA}
         </p>
-        <div className="mt-4 grid gap-3 font-mono text-sm text-cyan-100">
-          <p>Fragment A: {payload.fragmentA}</p>
-          <p>Flight Key: {payload.cipherKey}</p>
-          <p className="text-2xl tracking-widest text-amber-300">
-            {payload.cipherText}
-          </p>
-        </div>
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSubmit(answer);
+        <p className="font-mono text-sm text-[var(--fg-dim)]">
+          flight key: {payload.cipherKey}
+        </p>
+        <p className="mt-3 font-terminal text-2xl tracking-wide text-[var(--fg-warn)]">
+          {payload.cipherText}
+        </p>
+      </TermPanel>
+      <TermInput
+        placeholder="decoded_plaintext"
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        busy={submitting}
+        shake={shake}
+        submitLabel="decode"
+        onSubmitValue={(value) => {
+          setAnswer(value);
+          onSubmit(value);
         }}
-        className="flex gap-3"
-      >
-        <input
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Decoded plaintext"
-          className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 font-mono text-sm text-cyan-100 outline-none focus:border-cyan-400"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-xl bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 disabled:opacity-50"
-        >
-          Decode
-        </button>
-      </form>
+      />
     </div>
   );
 }
 
-export function StageCore({
-  stage,
-  onSubmit,
-  loading,
-}: {
-  stage: StageContent;
-  onSubmit: (answer: string) => void;
-  loading: boolean;
-}) {
+export function StageCore({ stage, onSubmit, submitting, shake }: StageProps) {
   const payload = stage.payload as {
     fragmentA: string;
     fragmentB: string;
@@ -154,32 +115,30 @@ export function StageCore({
   const [answer, setAnswer] = useState("");
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-cyan-500/20 bg-black p-6 font-mono text-sm">
-        <p className="text-emerald-400">{payload.terminalPrompt}</p>
-        <p className="mt-4 text-slate-500"># fragments loaded</p>
-        <p className="text-cyan-300">A={payload.fragmentA}</p>
-        <p className="text-cyan-300">B={payload.fragmentB}</p>
-        <p className="text-cyan-300">tail={payload.flightTail}</p>
-        <p className="text-amber-400">clue={payload.coreClue}</p>
-        <p className="mt-4 flex items-center gap-2 text-emerald-300">
-          <span>$</span>
-          <input
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            className="flex-1 bg-transparent outline-none"
-            placeholder="reconstruct --silent ..."
-          />
+    <div className="space-y-3">
+      <TermPanel>
+        <p className="font-mono text-sm text-[var(--fg-dim)]">
+          {payload.terminalPrompt}
         </p>
-      </div>
-      <button
-        type="button"
-        onClick={() => onSubmit(answer)}
-        disabled={loading}
-        className="w-full rounded-xl bg-amber-500 py-3 text-sm font-semibold text-slate-950 disabled:opacity-50"
-      >
-        Execute Signal Reconstruction
-      </button>
+        <div className="mt-3 space-y-1 font-mono text-sm">
+          <p>A={payload.fragmentA}</p>
+          <p>B={payload.fragmentB}</p>
+          <p>tail={payload.flightTail}</p>
+          <p className="text-[var(--fg-warn)]">clue={payload.coreClue}</p>
+        </div>
+      </TermPanel>
+      <TermInput
+        placeholder="reconstruct --silent ..."
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        busy={submitting}
+        shake={shake}
+        submitLabel="execute"
+        onSubmitValue={(value) => {
+          setAnswer(value);
+          onSubmit(value);
+        }}
+      />
     </div>
   );
 }

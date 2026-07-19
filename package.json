@@ -7,11 +7,14 @@
     "lint": "pnpm -r lint",
     "test": "pnpm --filter @dragonfly/drop-engine test && pnpm --filter @dragonfly/wing-generator test",
     "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy",
     "convex:sync-env": "node scripts/sync-convex-env.mjs",
     "convex:setup": "convex dev --once && node scripts/sync-convex-env.mjs",
+    "smoke:judge": "tsx scripts/smoke-judge-demo.ts",
     "contracts:setup": "pnpm --filter @dragonfly/contracts setup"
   },
   "devDependencies": {
+    "tsx": "^4.23.1",
     "typescript": "^5.8.3"
   },
   "packageManager": "pnpm@10.14.0",

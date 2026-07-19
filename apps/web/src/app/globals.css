@@ -1,27 +1,135 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #e2e8f0;
+  --bg: #030806;
+  --fg: #6dffb0;
+  --fg-bright: #8cffc8;
+  --fg-dim: #3a6b55;
+  --fg-warn: #ffb020;
+  --fg-err: #ff5c6a;
+  --panel: #07100c;
+  --border: #1a4032;
+  --background: var(--bg);
+  --foreground: var(--fg);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-display);
   --font-mono: var(--font-mono);
+  --font-terminal: var(--font-terminal);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-display), system-ui, sans-serif;
-}
-
-.font-display {
-  font-family: var(--font-display), system-ui, sans-serif;
+.font-terminal {
+  font-family: var(--font-terminal), "VT323", ui-monospace, monospace;
 }
 
 .font-mono {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.pixel-crisp {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.crt-root {
+  min-height: 100%;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.crt-root::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.12) 3px,
+    rgba(0, 0, 0, 0.12) 4px
+  );
+  opacity: 0.35;
+}
+
+.term-panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.term-prompt {
+  color: var(--fg-dim);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.term-input-wrap:focus-within {
+  outline: 1px solid var(--fg);
+  outline-offset: 0;
+}
+
+.term-input-wrap.is-busy {
+  opacity: 0.7;
+}
+
+.term-btn-instant {
+  transition: none;
+}
+
+.term-btn-instant:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+@keyframes pulse-line {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.term-pulse {
+  animation: pulse-line 0.9s steps(2, end) infinite;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+.term-shake {
+  animation: shake 0.16s steps(2, end);
+}
+
+::selection {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+a {
+  color: inherit;
+}
+
+a:hover {
+  color: var(--fg-bright);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .term-pulse,
+  .term-shake {
+    animation: none;
+  }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TermButton, TermPanel } from "@/components/terminal";
 import { WingPreview } from "@/components/wing/wing-preview";
 import {
   computeCredentialCommitment,
@@ -32,24 +33,25 @@ export function ClaimSandbox() {
   }
 
   return (
-    <div className="mx-auto max-w-lg space-y-6 px-6 py-16 text-center">
-      <h1 className="text-2xl text-cyan-100">Midnight Claim Sandbox</h1>
-      <p className="text-sm text-slate-400">
-        Client-side credential commitment + badge seed derivation (mirrors
-        dragonfly.compact).
-      </p>
-      <button
-        type="button"
-        onClick={runSlice}
-        className="rounded-full bg-amber-500 px-6 py-3 text-slate-950"
-      >
-        Run vertical slice
-      </button>
+    <div className="space-y-6">
+      <TermPanel>
+        <p className="font-terminal text-2xl text-[var(--fg)]">claim sandbox</p>
+        <p className="mt-2 font-mono text-sm text-[var(--fg-dim)]">
+          Client-side credential commitment and badge seed.
+        </p>
+      </TermPanel>
+      <TermButton type="button" onClick={runSlice}>
+        run slice
+      </TermButton>
       {result && (
-        <>
-          <p className="font-mono text-xs text-cyan-300 break-all">{result}</p>
-          <WingPreview badgeSeed={result} size={160} />
-        </>
+        <TermPanel>
+          <p className="break-all font-mono text-xs text-[var(--fg-dim)]">
+            {result}
+          </p>
+          <div className="mt-3">
+            <WingPreview badgeSeed={result} size={160} />
+          </div>
+        </TermPanel>
       )}
     </div>
   );

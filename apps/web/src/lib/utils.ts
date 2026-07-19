@@ -39,10 +39,16 @@ export function getFlightStorageKey(flightId: string): string {
   return `dragonfly-flight-${flightId}`;
 }
 
-export function saveActiveFlightId(flightId: string) {
+export function saveActiveFlightId(flightId: string, dropId?: string) {
   localStorage.setItem("dragonfly-active-flight", flightId);
+  if (dropId) {
+    localStorage.setItem(`dragonfly-active-flight:${dropId}`, flightId);
+  }
 }
 
-export function getActiveFlightId(): string | null {
+export function getActiveFlightId(dropId?: string): string | null {
+  if (dropId) {
+    return localStorage.getItem(`dragonfly-active-flight:${dropId}`);
+  }
   return localStorage.getItem("dragonfly-active-flight");
 }

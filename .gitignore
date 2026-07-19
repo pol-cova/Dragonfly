@@ -21,6 +21,7 @@ packages/contracts/.midnight-state.json
 
 # Convex
 .convex/
+.convex-tmp/
 
 # OS
 .DS_Store

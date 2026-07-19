@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const nextConfig: NextConfig = {
   turbopack: {
-    root: "../..",
+    // App package root — next resolves from apps/web/node_modules.
+    root: path.dirname(fileURLToPath(import.meta.url)),
   },
   transpilePackages: [
     "@dragonfly/shared",

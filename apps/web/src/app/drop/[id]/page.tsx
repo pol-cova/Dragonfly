@@ -1,9 +1,9 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import { FlightExperience } from "@/components/flight/flight-experience";
 
 export default function DropPage() {
-  return (
-    <div className="px-6 py-12">
-      <FlightExperience dropId="drop-001" />
-    </div>
-  );
+  const params = useParams<{ id: string }>();
+  return <FlightExperience key={params.id} dropId={params.id} />;
 }

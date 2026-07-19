@@ -29,7 +29,7 @@ Drop windows are seeded server-side via `internal.drops.ensureSeeded`. Public cl
 
 ## Live Drops
 
-Use `DRAGONFLY_ACTIVE_DROP_PATH` or Convex env for live puzzle secrets. Archive closed Drops separately if publishing solutions.
+Drop windows are seeded server-side via `internal.drops.ensureSeeded` and extended for judge Drops via `syncJudgeWindows`. Public clients cannot rewrite Drop windows.
 
 ## CTF safety
 

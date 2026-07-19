@@ -1,6 +1,8 @@
 import { z } from "zod";
 
+/** Featured Drop id — catalog lives in convex/lib/drops.ts */
 export const DROP_ID = "drop-001" as const;
+export const FEATURED_DROP_ID = DROP_ID;
 
 export const dropStatusSchema = z.enum([
   "upcoming",

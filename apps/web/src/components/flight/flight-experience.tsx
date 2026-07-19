@@ -1,10 +1,15 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "convex/_generated/api";
+import {
+  TermButton,
+  TermLink,
+  TermPanel,
+  TermStatus,
+} from "@/components/terminal";
 import { Countdown } from "@/components/ui/countdown";
 import {
   StageCore,
@@ -12,38 +17,45 @@ import {
   StageRecon,
 } from "@/components/puzzles/stage-panels";
 import type { StageContent } from "@dragonfly/shared";
-import {
-  getWalletSessionId,
-  saveActiveFlightId,
-} from "@/lib/utils";
+import { getWalletSessionId, saveActiveFlightId } from "@/lib/utils";
+
+function readSavedFlightId(dropId: string): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(`dragonfly-active-flight:${dropId}`);
+}
 
 export function FlightExperience({ dropId }: { dropId: string }) {
   const router = useRouter();
   const [now] = useState(() => Date.now());
-  const drop = useQuery(api.dropsQueries.getActive, { now });
+  const drop = useQuery(api.dropsQueries.getById, { dropId, now });
   const createFlight = useMutation(api.flights.create);
   const submitStage = useMutation(api.flights.submitStage);
-  const [flightId, setFlightId] = useState<string | null>(null);
+  const [flightId, setFlightId] = useState<string | null>(() =>
+    readSavedFlightId(dropId),
+  );
   const flight = useQuery(
     api.flights.get,
     flightId ? { flightId, now } : "skip",
   );
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [started, setStarted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [inputShake, setInputShake] = useState(false);
+  const [started, setStarted] = useState(() => Boolean(readSavedFlightId(dropId)));
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("dragonfly-active-flight");
-      if (saved) {
-        setFlightId(saved);
-        setStarted(true);
-      }
+    if (flight?.currentStage === 3 && flightId) {
+      router.prefetch(`/claim/${flightId}`);
     }
+  }, [flight?.currentStage, flightId, router]);
+
+  const flashInputError = useCallback(() => {
+    setInputShake(true);
+    window.setTimeout(() => setInputShake(false), 200);
   }, []);
 
   async function beginFlight() {
-    setLoading(true);
+    setStarting(true);
     setError(null);
     try {
       const result = await createFlight({
@@ -51,156 +63,159 @@ export function FlightExperience({ dropId }: { dropId: string }) {
         walletSessionId: getWalletSessionId(),
       });
       setFlightId(result.flightId);
-      saveActiveFlightId(result.flightId);
+      saveActiveFlightId(result.flightId, dropId);
       setStarted(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start Flight");
     } finally {
-      setLoading(false);
+      setStarting(false);
     }
   }
 
-  async function handleSubmit(answer: string) {
-    if (!flightId || !flight?.stage) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await submitStage({
-        flightId,
-        walletSessionId: getWalletSessionId(),
-        stage: flight.stage.number,
-        answer,
-      });
-      if (!result.correct) {
-        setError(result.message ?? "The signal does not match.");
-        return;
+  const handleSubmit = useCallback(
+    async (answer: string) => {
+      if (!flightId || !flight?.stage || submitting) return;
+      setSubmitting(true);
+      setError(null);
+      try {
+        const result = await submitStage({
+          flightId,
+          walletSessionId: getWalletSessionId(),
+          stage: flight.stage.number,
+          answer,
+        });
+        if (!result.correct) {
+          setError(result.message ?? "The signal does not match.");
+          flashInputError();
+          return;
+        }
+        if (result.claimReady) {
+          router.push(`/claim/${flightId}`);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Submission failed");
+        flashInputError();
+      } finally {
+        setSubmitting(false);
       }
-      if (result.claimReady) {
-        router.push(`/claim/${flightId}`);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Submission failed");
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [flight?.stage, flightId, flashInputError, router, submitStage, submitting],
+  );
 
   if (drop === undefined) {
-    return <p className="text-slate-400">Loading Drop...</p>;
+    return <p className="font-mono text-sm text-[var(--fg-dim)]">loading…</p>;
   }
 
   if (!drop) {
     return (
-      <p className="text-slate-400">
-        Drop unavailable. Run{" "}
-        <code className="text-cyan-300">npx convex dev</code> and start a Flight
-        to initialize.
+      <p className="font-mono text-sm text-[var(--fg-err)]">
+        drop unavailable — is convex dev running?
       </p>
     );
   }
 
-  const isClosed = drop.status === "closed";
+  const isClosed = drop.status === "closed" || drop.status === "archived";
 
   if (!started && !flightId) {
     return (
-      <div className="mx-auto max-w-2xl space-y-8">
-        <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-amber-400">
-            Flight Briefing
+      <div className="space-y-5">
+        <TermPanel>
+          <p className="font-terminal text-2xl text-[var(--fg)]">{drop.name}</p>
+          <p className="mt-3 font-mono text-sm leading-relaxed text-[var(--fg-dim)]">
+            {drop.story}
           </p>
-          <h1 className="mt-3 font-display text-4xl text-cyan-50">
-            {drop.name}
-          </h1>
-          <p className="mt-4 text-slate-300">{drop.story}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-6 text-sm text-slate-400">
-          <p>• Your puzzle variation is unique to this Flight.</p>
-          <p>• Answers and credentials are never published.</p>
-          <p>• Prove completion privately on Midnight to claim your Wing.</p>
-        </div>
+        </TermPanel>
         {isClosed ? (
-          <p className="text-amber-400">This Drop has closed.</p>
+          <p className="font-mono text-sm text-[var(--fg-warn)]">drop closed</p>
         ) : (
-          <button
-            type="button"
-            onClick={beginFlight}
-            disabled={loading}
-            className="rounded-full bg-amber-500 px-8 py-4 text-sm font-semibold uppercase tracking-[0.2em] text-slate-950"
-          >
-            Begin Flight
-          </button>
+          <TermButton type="button" onClick={beginFlight} disabled={starting}>
+            {starting ? "starting…" : "begin flight"}
+          </TermButton>
         )}
-        {error && <p className="text-red-400">{error}</p>}
+        {error && (
+          <p className="font-mono text-sm text-[var(--fg-err)]">{error}</p>
+        )}
       </div>
     );
   }
 
   if (!flight) {
-    return <p className="text-slate-400">Restoring Flight...</p>;
+    return (
+      <p className="font-mono text-sm text-[var(--fg-dim)]">loading flight…</p>
+    );
   }
 
   const stage = flight.stage as StageContent | undefined;
+  const stageKey = `${flight.flightId}-${flight.currentStage}`;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-cyan-400">
-            {flight.alias}
-          </p>
-          <h2 className="mt-2 text-2xl text-cyan-50">
-            Stage {flight.currentStage} — {stage?.title}
-          </h2>
+    <div className="space-y-5">
+      <TermPanel>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            <p className="font-terminal text-xl text-[var(--fg)]">
+              stage {flight.currentStage} · {stage?.title}
+            </p>
+            <TermStatus label="alias" value={flight.alias} />
+          </div>
+          <Countdown target={drop.closesAt} label="closes" />
         </div>
-        <Countdown target={drop.closesAt} label="Drop closes in" />
-      </div>
+        {stage && (
+          <div className="mt-4 space-y-2 font-mono text-sm">
+            <p className="text-[var(--fg-dim)]">{stage.narrative}</p>
+            <p className="text-[var(--fg)]">{stage.objective}</p>
+            {stage.hint && (
+              <details className="text-[var(--fg-dim)]">
+                <summary className="cursor-pointer hover:text-[var(--fg)]">
+                  hint
+                </summary>
+                <p className="mt-2">{stage.hint}</p>
+              </details>
+            )}
+          </div>
+        )}
+      </TermPanel>
 
-      {stage && (
-        <div className="space-y-4">
-          <p className="text-slate-300">{stage.narrative}</p>
-          <p className="text-sm text-amber-300/80">{stage.objective}</p>
-          {stage.hint && (
-            <details className="text-sm text-slate-500">
-              <summary className="cursor-pointer text-cyan-400/80">
-                Hint
-              </summary>
-              <p className="mt-2">{stage.hint}</p>
-            </details>
-          )}
-        </div>
+      {submitting && (
+        <p className="font-mono text-sm text-[var(--fg-dim)] term-pulse">
+          verifying…
+        </p>
       )}
 
       {stage?.number === 1 && (
-        <StageRecon stage={stage} onSubmit={handleSubmit} loading={loading} />
+        <StageRecon
+          key={stageKey}
+          stage={stage}
+          onSubmit={handleSubmit}
+          submitting={submitting}
+          shake={inputShake}
+        />
       )}
       {stage?.number === 2 && (
-        <StageCrypto stage={stage} onSubmit={handleSubmit} loading={loading} />
+        <StageCrypto
+          key={stageKey}
+          stage={stage}
+          onSubmit={handleSubmit}
+          submitting={submitting}
+          shake={inputShake}
+        />
       )}
       {stage?.number === 3 && (
-        <StageCore stage={stage} onSubmit={handleSubmit} loading={loading} />
+        <StageCore
+          key={stageKey}
+          stage={stage}
+          onSubmit={handleSubmit}
+          submitting={submitting}
+          shake={inputShake}
+        />
       )}
 
-      <div className="flex gap-2">
-        {[1, 2, 3].map((n) => (
-          <div
-            key={n}
-            className={`h-2 flex-1 rounded-full ${
-              flight.completedStages.includes(n)
-                ? "bg-amber-400"
-                : flight.currentStage === n
-                  ? "bg-cyan-400"
-                  : "bg-slate-800"
-            }`}
-          />
-        ))}
-      </div>
-
-      {error && <p className="text-red-400">{error}</p>}
+      {error && (
+        <p className="font-mono text-sm text-[var(--fg-err)]">{error}</p>
+      )}
 
       {flight.status === "claimed" && (
-        <Link href={`/wing/${flight.flightId}`} className="text-cyan-300 underline">
-          View your Wing
-        </Link>
+        <TermLink href={`/wing/${flight.flightId}`}>view wing</TermLink>
       )}
     </div>
   );
