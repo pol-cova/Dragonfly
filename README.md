@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/dragon-banner.png" alt="Dragonfly — private CTF drops on Midnight" width="100%" />
+</p>
+
 # Dragonfly
 
 **Solve the challenge. Prove it privately. Claim the Wing.**
@@ -31,8 +35,22 @@ cd packages/contracts && pnpm setup            # optional: Midnight contract
 
 See [.env.example](.env.example) for environment variables.
 
+## Pitch video (Remotion)
+
+A 2-minute kinetic demo lives in [`demo/`](demo/) — preview with `cd demo && npm run dev`, render with `npx remotion render DragonflyPitch out/dragonfly-pitch.mp4`. See [demo/README.md](demo/README.md).
+
 ## Contributing
 
-PRs welcome — read [CONTRIBUTING.md](CONTRIBUTING.md). Do not commit live Drop answers or `.env` files.
+PRs welcome — please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening one.
 
-[Security](SECURITY.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [MIT License](LICENSE) © [pol-cova](https://github.com/pol-cova)
+**Do not commit:**
+- Live Drop answers or solver payloads
+- `.env` files or other secrets
+
+**Maintainers:** [@pol-cova](https://github.com/pol-cova) · [@mitosky07](https://github.com/mitosky07)
+
+| | |
+|---|---|
+| [Security](SECURITY.md) | Report vulnerabilities |
+| [Code of Conduct](CODE_OF_CONDUCT.md) | Community standards |
+| [MIT License](LICENSE) | Open-source terms |

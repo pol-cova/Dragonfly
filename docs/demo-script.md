@@ -2,7 +2,7 @@
 
 ## 0:00–0:12 — Hook
 
-> "This is Dragonfly, built for the Midnight Hackathon. Dragonfly turns CTF challenges into limited-time Drops where players prove completion without publicly revealing their solution."
+> "We are Paul Contreras and Manuel Contreras — and this is our submission for the Midnight Hackathon. Dragonfly turns CTF challenges into limited-time Drops where players prove completion without publicly revealing their solution."
 
 Show active Drop and countdown on home page.
 
@@ -39,3 +39,13 @@ Show closed Drop state (or explain closing window).
 ## Judge link
 
 Share [judge-runbook.md](./judge-runbook.md) and the deployed URL before judging.
+
+## Remotion pitch (optional)
+
+For a motion-graphic version of this script, see [`demo/`](../demo/) — `npm run dev` in that folder opens Remotion Studio. Render with:
+
+```bash
+cd demo && npx remotion render DragonflyPitch out/dragonfly-pitch.mp4
+```
+
+If you record voiceover over the render, still say the hackathon name at the start.
