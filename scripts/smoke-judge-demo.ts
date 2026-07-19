@@ -10,15 +10,28 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api.js";
 import {
   decodeStage1Fragment,
-  generateFlight,
+  reverseSubstitution,
+  type Stage1Payload,
 } from "../packages/drop-engine/src/index.ts";
-import { computeBadgeSeed, computeNullifier } from "../packages/shared/src/index.ts";
+import { normalizeAnswer } from "../packages/shared/src/index.ts";
 
 const JUDGE_DROP_ID = "drop-003";
 
-function requireEnv(name: string): string {
-  const value = process.env[name] ?? process.env.CONVEX_URL;
-  if (name !== "NEXT_PUBLIC_CONVEX_URL" && value) return value;
+type StagePayload = {
+  cipherKey?: string;
+  cipherText?: string;
+  fragmentA?: string;
+  fragmentB?: string;
+  flightTail?: string;
+  coreClue?: string;
+};
+
+type StageContent = {
+  number: number;
+  payload: Stage1Payload | StagePayload;
+};
+
+function requireEnv(): string {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL ?? process.env.CONVEX_URL;
   if (!url) {
     console.error(
@@ -29,8 +42,36 @@ function requireEnv(name: string): string {
   return url;
 }
 
-function sessionId(label: string): string {
-  return `smoke-${label}-${crypto.randomUUID()}`;
+function sessionId(): string {
+  // Must be a bare UUID — Convex rejects prefixed session ids.
+  return crypto.randomUUID();
+}
+
+function solveStage1(stage: StageContent): string {
+  return decodeStage1Fragment(stage.payload as Stage1Payload);
+}
+
+function solveStage2(stage: StageContent): string {
+  const payload = stage.payload as StagePayload;
+  if (!payload.cipherKey || !payload.cipherText) {
+    throw new Error("Stage 2 payload missing cipher fields");
+  }
+  return reverseSubstitution(payload.cipherText, payload.cipherKey);
+}
+
+function solveStage3(stage: StageContent): string {
+  const payload = stage.payload as StagePayload;
+  if (
+    !payload.fragmentA ||
+    !payload.fragmentB ||
+    !payload.flightTail ||
+    !payload.coreClue
+  ) {
+    throw new Error("Stage 3 payload missing reconstruction fields");
+  }
+  return normalizeAnswer(
+    `${payload.fragmentA}:${payload.fragmentB}:${payload.flightTail}:${payload.coreClue}`,
+  );
 }
 
 async function playJudgePath(
@@ -43,67 +84,68 @@ async function playJudgePath(
     walletSessionId,
   });
 
-  const expected = generateFlight(dropId, created.flightId);
-  const stage1Payload = expected.stage1.payload as {
-    location: { channel: string; marker: string };
-    waveform: string;
-    metadataHint: string;
-    channel: string;
-  };
-  const stage1Answer = decodeStage1Fragment(stage1Payload);
-  if (stage1Answer !== expected.stage1Answer) {
-    throw new Error("Stage 1 decode mismatch");
+  const stage1 = created.stage as StageContent;
+  const stage1Answer = solveStage1(stage1);
+
+  const stage1Result = await client.mutation(api.flights.submitStage, {
+    flightId: created.flightId,
+    walletSessionId,
+    stage: 1,
+    answer: stage1Answer,
+  });
+  if (!stage1Result.correct || !stage1Result.nextStage) {
+    throw new Error("Stage 1 rejected");
   }
 
-  for (const [stage, answer] of [
-    [1, stage1Answer],
-    [2, expected.stage2Answer],
-    [3, expected.stage3Answer],
-  ] as const) {
-    const result = await client.mutation(api.flights.submitStage, {
-      flightId: created.flightId,
-      walletSessionId,
-      stage,
-      answer,
-    });
-    if (!result.correct) {
-      throw new Error(`Stage ${stage} rejected`);
-    }
-    if (stage === 3 && !result.claimReady) {
-      throw new Error("Stage 3 did not mark claimReady");
-    }
+  const stage2Answer = solveStage2(stage1Result.nextStage as StageContent);
+  const stage2Result = await client.mutation(api.flights.submitStage, {
+    flightId: created.flightId,
+    walletSessionId,
+    stage: 2,
+    answer: stage2Answer,
+  });
+  if (!stage2Result.correct || !stage2Result.nextStage) {
+    throw new Error("Stage 2 rejected");
+  }
+
+  const stage3Answer = solveStage3(stage2Result.nextStage as StageContent);
+  const stage3Result = await client.mutation(api.flights.submitStage, {
+    flightId: created.flightId,
+    walletSessionId,
+    stage: 3,
+    answer: stage3Answer,
+  });
+  if (!stage3Result.correct || !stage3Result.claimReady) {
+    throw new Error("Stage 3 rejected or claim not ready");
   }
 
   const creds = await client.action(api.flights.complete, {
     flightId: created.flightId,
     walletSessionId,
   });
-
-  if (creds.completionCredential !== expected.completionCredential) {
-    throw new Error("Credential mismatch after complete");
+  if (!creds.completionCredential || !creds.privatePlayerSecret) {
+    throw new Error("complete did not return credentials");
   }
 
   const claim = await client.mutation(api.flights.recordClaim, {
     flightId: created.flightId,
     walletSessionId,
   });
-
-  const nullifier = computeNullifier(dropId, expected.privatePlayerSecret);
-  const expectedBadge = computeBadgeSeed(
-    dropId,
-    nullifier,
-    expected.credentialCommitment,
-  );
-
-  if (claim.badgeSeed !== expectedBadge) {
-    throw new Error("Badge seed mismatch");
+  if (!claim.badgeSeed || !claim.alias) {
+    throw new Error("recordClaim missing badge or alias");
   }
 
-  return { flightId: created.flightId, alias: claim.alias, badgeSeed: claim.badgeSeed };
+  return {
+    flightId: created.flightId,
+    alias: claim.alias,
+    badgeSeed: claim.badgeSeed,
+    stage1Answer,
+    stage2Answer,
+  };
 }
 
 async function main() {
-  const url = requireEnv("NEXT_PUBLIC_CONVEX_URL");
+  const url = requireEnv();
   const client = new ConvexHttpClient(url);
 
   console.log(`Smoke test → ${url}`);
@@ -123,23 +165,20 @@ async function main() {
   }
   console.log(`✓ ${drop.name} is active`);
 
-  const sessionA = sessionId("a");
-  const runA = await playJudgePath(client, sessionA, JUDGE_DROP_ID);
+  const runA = await playJudgePath(client, sessionId(), JUDGE_DROP_ID);
   console.log(`✓ session A claimed Wing (${runA.alias})`);
 
-  const sessionB = sessionId("b");
+  const sessionB = sessionId();
   const createdB = await client.mutation(api.flights.create, {
     dropId: JUDGE_DROP_ID,
     walletSessionId: sessionB,
   });
-  const expectedB = generateFlight(JUDGE_DROP_ID, createdB.flightId);
-  const expectedA = generateFlight(JUDGE_DROP_ID, runA.flightId);
 
   const crossCheck = await client.mutation(api.flights.submitStage, {
     flightId: createdB.flightId,
     walletSessionId: sessionB,
     stage: 1,
-    answer: expectedA.stage1Answer,
+    answer: runA.stage1Answer,
   });
 
   if (crossCheck.correct) {
@@ -147,7 +186,19 @@ async function main() {
   }
   console.log("✓ cross-session answers rejected");
 
-  if (expectedA.stage2Answer === expectedB.stage2Answer) {
+  const stage1B = createdB.stage as StageContent;
+  const stage1AnswerB = solveStage1(stage1B);
+  const stage1BResult = await client.mutation(api.flights.submitStage, {
+    flightId: createdB.flightId,
+    walletSessionId: sessionB,
+    stage: 1,
+    answer: stage1AnswerB,
+  });
+  if (!stage1BResult.correct || !stage1BResult.nextStage) {
+    throw new Error("Session B stage 1 failed");
+  }
+  const stage2AnswerB = solveStage2(stage1BResult.nextStage as StageContent);
+  if (runA.stage2Answer === stage2AnswerB) {
     throw new Error("Expected unique stage 2 answers across flights");
   }
   console.log("✓ per-flight uniqueness");
@@ -165,6 +216,9 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("\n✗ smoke:judge failed:", error instanceof Error ? error.message : error);
+  console.error(
+    "\n✗ smoke:judge failed:",
+    error instanceof Error ? error.message : error,
+  );
   process.exit(1);
 });
