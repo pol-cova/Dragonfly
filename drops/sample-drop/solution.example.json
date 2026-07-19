@@ -1,0 +1,6 @@
+{
+  "note": "Example answers for the sample drop only. Live Drop 001 answers are never committed.",
+  "stage1": "SIG-ABCDEF",
+  "stage2": "NODE-GHIJKL",
+  "stage3Format": "FRAGA:FRAGB:tail:clue"
+}

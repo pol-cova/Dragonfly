@@ -1,0 +1,122 @@
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+
+// Domain-separated hashing helpers
+circuit credentialCommitmentHash(
+  dropId: Bytes<32>,
+  flightId: Bytes<32>,
+  credential: Bytes<32>
+): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "dragonfly:credential:v1"),
+    dropId,
+    flightId,
+    credential
+  ]);
+}
+
+circuit playerNullifier(
+  dropId: Bytes<32>,
+  privatePlayerSecret: Bytes<32>
+): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([
+    pad(32, "dragonfly:nullifier:v1"),
+    dropId,
+    privatePlayerSecret
+  ]);
+}
+
+circuit badgeSeedHash(
+  dropId: Bytes<32>,
+  nullifier: Bytes<32>,
+  commitment: Bytes<32>
+): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "dragonfly:badge:v1"),
+    dropId,
+    nullifier,
+    commitment
+  ]);
+}
+
+circuit operatorHash(secret: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([
+    pad(32, "dragonfly:operator:v1"),
+    secret
+  ]);
+}
+
+// Public ledger state
+export ledger dropOpensAt: Uint<64>;
+export ledger dropClosesAt: Uint<64>;
+export ledger dropActive: Boolean;
+export ledger operatorCommitment: Bytes<32>;
+
+export ledger flightCommitments: Set<Bytes<32>>;
+export ledger claimedCommitments: Set<Bytes<32>>;
+export ledger usedNullifiers: Set<Bytes<32>>;
+
+export ledger claimCount: Counter;
+
+export ledger lastClaimAlias: Opaque<"string">;
+export ledger lastBadgeSeed: Bytes<32>;
+
+constructor(operatorSecret: Bytes<32>) {
+  dropOpensAt = 0;
+  dropClosesAt = 0;
+  dropActive = false;
+  operatorCommitment = operatorHash(operatorSecret);
+}
+
+witness operatorSecret(): Bytes<32>;
+
+circuit assertOperator(): [] {
+  const secret = operatorSecret();
+  assert(operatorHash(secret) == operatorCommitment, "unauthorized operator");
+}
+
+export circuit registerDrop(opensAt: Uint<64>, closesAt: Uint<64>): [] {
+  assertOperator();
+  assert(closesAt > opensAt, "invalid window");
+  dropOpensAt = opensAt;
+  dropClosesAt = closesAt;
+  dropActive = true;
+}
+
+export circuit registerFlightCommitment(commitment: Bytes<32>): [] {
+  assertOperator();
+  assert(dropActive, "drop inactive");
+  assert(!flightCommitments.member(commitment), "duplicate commitment");
+  flightCommitments.insert(disclose(commitment));
+}
+
+witness completionCredential(): Bytes<32>;
+witness privatePlayerSecret(): Bytes<32>;
+witness flightIdBytes(): Bytes<32>;
+witness dropIdBytes(): Bytes<32>;
+
+export circuit claimWing(alias: Opaque<"string">): [] {
+  assert(dropActive, "drop closed");
+
+  const credential = completionCredential();
+  const playerSecret = privatePlayerSecret();
+  const flightId = flightIdBytes();
+  const dropId = dropIdBytes();
+
+  const commitment = credentialCommitmentHash(dropId, flightId, credential);
+
+  assert(flightCommitments.member(disclose(commitment)), "unknown commitment");
+  assert(!claimedCommitments.member(disclose(commitment)), "already claimed");
+
+  const nullifier = playerNullifier(dropId, playerSecret);
+  assert(!usedNullifiers.member(disclose(nullifier)), "duplicate player claim");
+
+  claimedCommitments.insert(disclose(commitment));
+  usedNullifiers.insert(disclose(nullifier));
+
+  const badgeSeed = badgeSeedHash(dropId, nullifier, commitment);
+  lastBadgeSeed = disclose(badgeSeed);
+  lastClaimAlias = disclose(alias);
+  claimCount.increment(1);
+}
